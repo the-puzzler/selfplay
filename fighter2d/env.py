@@ -156,6 +156,9 @@ class FighterEnv:
             min_dz = jnp.min(dz - rad)  # lowest point relative to root
             z_abs = self.base_z + q[1]
             z_abs = jnp.maximum(z_abs, self.SPAWN_GAP - min_dz)
+            # Never spawn at game over: torso starts above the knockdown line
+            # (the fighter may still be doomed, but the episode is playable).
+            z_abs = jnp.maximum(z_abs, DOWN_Z + self.SPAWN_GAP)
             q = q.at[1].set(z_abs - self.base_z)
             if i == 0:
                 q0 = q

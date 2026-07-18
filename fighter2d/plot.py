@@ -216,7 +216,7 @@ def _svg_panel(lines, title, unit, series):
     )
 
 
-def render_html(run: Path, lines):
+def render_html(run: Path, lines, note=""):
     last = lines[-1]
     panels = "".join(_svg_panel(lines, t, u, s) for _, t, u, s in PANELS)
     cols = ["iter", "env_steps", "mean_ep_len", "timeout_rate", "draw_rate", "v_loss", "entropy"]
@@ -235,7 +235,7 @@ def render_html(run: Path, lines):
         .replace("__SUBTITLE__",
                  f"iter {last['iter']:.0f} · {last['env_steps']:.2e} env steps · "
                  f"{last['sps']:.0f} steps/s · updated {time.strftime('%H:%M:%S')} · "
-                 "auto-reloads every 20s while the run is live")
+                 "auto-reloads every 20s while the run is live" + note)
         .replace("__PANELS__", panels)
         .replace("__TABLE__", table)
         .replace("__DATA__", data)
@@ -243,17 +243,39 @@ def render_html(run: Path, lines):
     (run / "dashboard.html").write_text(html)
 
 
+def adjust_for_spawn_dead(lines, f_either, f_both):
+    """Correct aggregate metrics to exclude spawn-dead episodes (which last
+    1 step and are decided at spawn). Only for runs whose reset distribution
+    allowed them; newer runs exclude these at the source."""
+    out = []
+    for m in lines:
+        m = dict(m)
+        m["mean_ep_len"] = max((m["mean_ep_len"] - f_either) / (1 - f_either), 0.0)
+        m["timeout_rate"] = m["timeout_rate"] / (1 - f_either)
+        m["draw_rate"] = max((m["draw_rate"] - f_both) / (1 - f_either), 0.0)
+        out.append(m)
+    return out
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--run", type=str, required=True)
+    p.add_argument("--doa-either", type=float, default=0.0,
+                   help="measured fraction of episodes with a spawn-dead fighter")
+    p.add_argument("--doa-both", type=float, default=0.0)
     args = p.parse_args()
     run = Path(args.run)
     lines = [json.loads(l) for l in (run / "metrics.jsonl").open()]
     if not lines:
         print("no metrics yet")
         return
+    note = ""
+    if args.doa_either > 0:
+        lines = adjust_for_spawn_dead(lines, args.doa_either, args.doa_both)
+        note = (f" · ep_len/draw/timeout adjusted to exclude spawn-dead episodes "
+                f"(measured {args.doa_either:.0%} of spawns)")
     render_png(run, lines)
-    render_html(run, lines)
+    render_html(run, lines, note)
     print(f"dashboard ({len(lines)} iters) -> {run}/dashboard.png + dashboard.html")
 
 
