@@ -143,12 +143,12 @@ def make_train_iter(env: WaypointEnv, cfg):
         (params, opt_state, rng), aux = jax.lax.scan(
             epoch, (params, opt_state, rng), None, length=cfg["update_epochs"])
 
-        n_done = (infos["reach"] | infos["timeout"]).sum()
+        n_done = (infos["reach"] | infos["timeout"] | infos["tipped"]).sum()
         metrics = {
             "episodes": n_done,
             "win0_rate": infos["reach"].sum() / jnp.maximum(n_done, 1),  # reach rate
             "win1_rate": jnp.zeros(()),
-            "draw_rate": infos["timeout"].sum() / jnp.maximum(n_done, 1),
+            "draw_rate": infos["tipped"].sum() / jnp.maximum(n_done, 1),  # tip-fail rate
             "timeout_rate": infos["timeout"].sum() / jnp.maximum(n_done, 1),
             "mean_ep_len": infos["ep_len"].sum() / jnp.maximum(n_done, 1),
             "final_dist": infos["final_dist"].sum() / jnp.maximum(n_done, 1),

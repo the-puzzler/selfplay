@@ -47,6 +47,10 @@ GAP_DEPTH = 3.0
 WP_MIN, WP_MAX = 1.5, 9.0
 WP_BEHIND_P = 0.35  # fraction of waypoints spawning behind the stickman
 REACH = 0.6
+# BipedalWalker-style uprightness rule: torso tipping past this angle from
+# vertical ends the episode (a fail, reward 0). Kills tumbling gaits as a
+# strategy without any reward shaping — it's a rule, not a bonus.
+TIP_LIMIT = 1.3  # rad (~75 degrees)
 # PARTIAL observation: terrain visible only within ~2 units of the body.
 # Waypoints can be 9 units out — the terrain between must be discovered by
 # traveling and REMEMBERED (the recurrent policy's job). The waypoint
@@ -231,8 +235,11 @@ class WaypointEnv:
             pts, prev = self._substep(pts, prev, action, s.h)
         t = s.t + 1
         reached = jnp.linalg.norm(pts[2] - s.wp) < REACH
+        torso = pts[1] - pts[2]  # pelvis -> neck
+        tipped = jnp.abs(jnp.arctan2(torso[0], torso[1])) > TIP_LIMIT
+        tipped = tipped & ~reached
         timeout = t >= EPISODE_LEN
-        done = reached | timeout
+        done = reached | timeout | tipped
         reward = reached.astype(jnp.float32)
 
         new = EnvState(pts=pts, prev=prev, h=s.h, wp=s.wp, t=t)
@@ -242,7 +249,8 @@ class WaypointEnv:
         obs = self._obs(s2)
         info = {
             "reach": reached & done,
-            "timeout": timeout & ~reached,
+            "timeout": timeout & ~reached & ~tipped,
+            "tipped": tipped,
             "ep_len": jnp.where(done, t, 0),
             "final_dist": jnp.where(done, jnp.abs(pts[2, 0] - s.wp[0]), 0.0),
         }
