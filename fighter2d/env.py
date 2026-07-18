@@ -168,19 +168,25 @@ class FighterEnv:
                 q1 = q
 
         if self.reset_mode == "diverse":
-            # Place the pair with random separation (never overlapping: the
-            # minimum is the poses' combined reach), random arena position,
-            # random side assignment. Sampling separation directly avoids the
-            # old artifact where close pairs snapped to exactly min_sep.
-            ext0 = jnp.max(jnp.abs(dx0) + rad0)
-            ext1 = jnp.max(jnp.abs(dx1) + rad1)
-            min_sep = ext0 + ext1 + self.SPAWN_GAP
+            # Place the pair with random separation (never overlapping),
+            # random arena position, random side assignment. The minimum
+            # separation is *directional*: the inner fighter's reach toward
+            # the opponent, not the max reach in both directions — so poses
+            # with limbs tucked/pointing away can spawn nearly torso-to-torso.
+            right_reach = jnp.array([jnp.max(dx0 + rad0), jnp.max(dx1 + rad1)])
+            left_reach = jnp.array([jnp.max(-dx0 + rad0), jnp.max(-dx1 + rad1)])
             ksep, kc, kside = jax.random.split(rplace, 3)
+            side = jnp.where(jax.random.bernoulli(kside), 1.0, -1.0)
+            # side=+1: fighter0 left of fighter1; side=-1: swapped.
+            min_sep = jnp.where(
+                side > 0,
+                right_reach[0] + left_reach[1],
+                right_reach[1] + left_reach[0],
+            ) + self.SPAWN_GAP
             sep = jax.random.uniform(ksep, minval=min_sep, maxval=4.8)
             half = 0.5 * sep
             cmax = 2.4 - half
             c = jax.random.uniform(kc, minval=-cmax, maxval=cmax)
-            side = jnp.where(jax.random.bernoulli(kside), 1.0, -1.0)
             new_x0 = c - side * half
             new_x1 = c + side * half
             q0 = q0.at[0].set(new_x0 - self.init_x[0])
