@@ -1,0 +1,12 @@
+{
+  "n_groups": 128,
+  "group_size": 8,
+  "num_minibatches": 8,
+  "update_epochs": 2,
+  "lr": 0.0003,
+  "clip_eps": 0.2,
+  "ent_coef": 0.005,
+  "max_grad_norm": 0.5,
+  "reset_mode": "diverse",
+  "seed": 0
+}
