@@ -58,6 +58,8 @@ def draw_frame(ax, s, trails, flash):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--ckpt", type=str, default=None)
+    p.add_argument("--ckpt-b", type=str, default=None,
+                   help="separate policy for the blue ship (ship 1)")
     p.add_argument("--out", type=str, default="dogfight.mp4")
     p.add_argument("--reset-mode", choices=["fixed", "diverse"], default="fixed")
     p.add_argument("--episodes", type=int, default=5)
@@ -69,6 +71,9 @@ def main():
     params = network.init(jax.random.PRNGKey(0), jnp.zeros((1, OBS_DIM)))
     if args.ckpt:
         params = serialization.from_bytes(params, Path(args.ckpt).read_bytes())
+    params_b = params
+    if args.ckpt_b:
+        params_b = serialization.from_bytes(params, Path(args.ckpt_b).read_bytes())
 
     fig, ax = plt.subplots(figsize=(6, 6), facecolor="#101018")
     ax.set_facecolor("#101018")
@@ -81,7 +86,9 @@ def main():
         state, obs = env.reset(k)
         trails = [[np.asarray(state.pos[i]).copy()] for i in range(2)]
         for _t in range(EPISODE_LEN):
-            action = jnp.asarray(policy_act(network, params, obs))
+            a0 = policy_act(network, params, obs[0:1])[0]
+            a1 = policy_act(network, params_b, obs[1:2])[0]
+            action = jnp.array([a0, a1])
             rng, k = jax.random.split(rng)
             prev = state
             state, obs, reward, done, _ = step(k, prev, action)
