@@ -1,0 +1,63 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta http-equiv="refresh" content="20">
+<title>fighter2d — dog-v1</title>
+<style>
+:root { color-scheme: light dark;
+  --surface:#ffffff; --ink:#333333; --ink-muted:#666666; --grid:#e6e6e6;
+  --s1:#2a78d6; --s2:#008300; --s3:#e87ba4; --s6:#eb6834; --s7:#4a3aa7; }
+@media (prefers-color-scheme: dark) { :root {
+  --surface:#1a1a19; --ink:#ffffff; --ink-muted:#c3c2b7; --grid:#3a3a38;
+  --s1:#3987e5; --s2:#008300; --s3:#d55181; --s6:#d95926; --s7:#9085e9; } }
+body { margin:0; padding:16px; background:var(--surface); color:var(--ink);
+  font:14px/1.4 -apple-system, system-ui, sans-serif; }
+h1 { font-size:15px; font-weight:600; margin:0 0 2px; }
+.sub { color:var(--ink-muted); font-size:12px; margin-bottom:12px; }
+.grid2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(420px,1fr)); gap:16px; }
+.panel h2 { font-size:13px; font-weight:600; margin:0 0 2px; }
+.panel .unit { color:var(--ink-muted); font-size:11px; }
+svg { width:100%; height:auto; display:block; }
+.gridline { stroke:var(--grid); stroke-width:1; }
+.tick { fill:var(--ink-muted); font-size:10px; }
+.endlab { fill:var(--ink); font-size:11px; }
+.series { fill:none; stroke-width:2; }
+.crosshair { stroke:var(--ink-muted); stroke-width:1; stroke-dasharray:3 3; opacity:0; }
+#tooltip { position:fixed; pointer-events:none; background:var(--surface); color:var(--ink);
+  border:1px solid var(--grid); border-radius:6px; padding:6px 9px; font-size:12px;
+  opacity:0; box-shadow:0 2px 8px rgba(0,0,0,.15); z-index:9; white-space:nowrap; }
+#tooltip .row { display:flex; gap:6px; align-items:center; }
+#tooltip .chip { width:8px; height:8px; border-radius:2px; display:inline-block; }
+.legend { display:flex; gap:14px; font-size:11px; color:var(--ink); margin:2px 0 0 44px; }
+.legend .chip { width:9px; height:9px; border-radius:2px; display:inline-block; margin-right:4px; }
+details { margin-top:18px; color:var(--ink-muted); font-size:12px; }
+table { border-collapse:collapse; margin-top:6px; }
+td,th { padding:3px 10px; text-align:right; border-bottom:1px solid var(--grid); color:var(--ink); font-size:11px; }
+th { color:var(--ink-muted); font-weight:500; }
+</style></head><body>
+<h1>fighter2d — dog-v1</h1>
+<div class="sub">iter 7 · 1.84e+06 env steps · 78547 steps/s · updated 16:10:31 · auto-reloads every 20s while the run is live</div>
+<div class="grid2"><div class="panel"><h2>Mean episode length</h2><div class="unit">steps (300 = timeout)&nbsp;</div><svg viewBox="0 0 520 260" data-panel='{"x0": 46, "x1": 436, "series": [{"k": "mean_ep_len", "v": "s1", "n": "Mean episode length"}]}'><line class="gridline" x1="46" y1="218.4" x2="436" y2="218.4"/><text class="tick" x="40" y="221.4" text-anchor="end">50</text><line class="gridline" x1="46" y1="151.6" x2="436" y2="151.6"/><text class="tick" x="40" y="154.6" text-anchor="end">100</text><line class="gridline" x1="46" y1="84.8" x2="436" y2="84.8"/><text class="tick" x="40" y="87.8" text-anchor="end">150</text><line class="gridline" x1="46" y1="18.0" x2="436" y2="18.0"/><text class="tick" x="40" y="21.0" text-anchor="end">200</text><text class="tick" x="105.0" y="252" text-anchor="middle">500k</text><text class="tick" x="229.0" y="252" text-anchor="middle">1.0M</text><text class="tick" x="352.9" y="252" text-anchor="middle">1.5M</text><polyline class="series" style="stroke:var(--s1)" points="46.0,220.4 111.0,25.6 176.0,132.0 241.0,126.9 306.0,150.1 371.0,141.2 436.0,138.4"/><circle cx="436.0" cy="138.4" r="4" style="fill:var(--s1)"/><text class="endlab" x="443.0" y="142.4">110</text><line class="crosshair" y1="10" y2="236" x1="0" x2="0"/></svg></div><div class="panel"><h2>Episode outcomes</h2><div class="unit">fraction of episodes&nbsp;</div><svg viewBox="0 0 520 260" data-panel='{"x0": 46, "x1": 436, "series": [{"k": "timeout_rate", "v": "s2", "n": "timeout"}, {"k": "draw_rate", "v": "s3", "n": "draw (incl. timeouts)"}]}'><line class="gridline" x1="46" y1="220.4" x2="436" y2="220.4"/><text class="tick" x="40" y="223.4" text-anchor="end">0</text><line class="gridline" x1="46" y1="153.4" x2="436" y2="153.4"/><text class="tick" x="40" y="156.4" text-anchor="end">0.2</text><line class="gridline" x1="46" y1="86.3" x2="436" y2="86.3"/><text class="tick" x="40" y="89.3" text-anchor="end">0.4</text><line class="gridline" x1="46" y1="19.2" x2="436" y2="19.2"/><text class="tick" x="40" y="22.2" text-anchor="end">0.6</text><text class="tick" x="105.0" y="252" text-anchor="middle">500k</text><text class="tick" x="229.0" y="252" text-anchor="middle">1.0M</text><text class="tick" x="352.9" y="252" text-anchor="middle">1.5M</text><polyline class="series" style="stroke:var(--s2)" points="46.0,220.4 111.0,26.1 176.0,167.3 241.0,180.0 306.0,198.3 371.0,194.8 436.0,189.4"/><circle cx="436.0" cy="189.4" r="4" style="fill:var(--s2)"/><text class="endlab" x="443.0" y="193.4">timeout 0.0924</text><polyline class="series" style="stroke:var(--s3)" points="46.0,219.5 111.0,25.6 176.0,166.9 241.0,179.5 306.0,197.3 371.0,193.9 436.0,188.8"/><circle cx="436.0" cy="188.8" r="4" style="fill:var(--s3)"/><text class="endlab" x="443.0" y="192.8">draw (incl. timeouts) 0.0941</text><line class="crosshair" y1="10" y2="236" x1="0" x2="0"/></svg><div class="legend"><span><span class="chip" style="background:var(--s2)"></span>timeout</span><span><span class="chip" style="background:var(--s3)"></span>draw (incl. timeouts)</span></div></div><div class="panel"><h2>Value loss</h2><div class="unit">&nbsp;</div><svg viewBox="0 0 520 260" data-panel='{"x0": 46, "x1": 436, "series": [{"k": "v_loss", "v": "s6", "n": "Value loss"}]}'><line class="gridline" x1="46" y1="201.2" x2="436" y2="201.2"/><text class="tick" x="40" y="204.2" text-anchor="end">0.02</text><line class="gridline" x1="46" y1="138.8" x2="436" y2="138.8"/><text class="tick" x="40" y="141.8" text-anchor="end">0.025</text><line class="gridline" x1="46" y1="76.5" x2="436" y2="76.5"/><text class="tick" x="40" y="79.5" text-anchor="end">0.03</text><line class="gridline" x1="46" y1="14.2" x2="436" y2="14.2"/><text class="tick" x="40" y="17.2" text-anchor="end">0.035</text><text class="tick" x="105.0" y="252" text-anchor="middle">500k</text><text class="tick" x="229.0" y="252" text-anchor="middle">1.0M</text><text class="tick" x="352.9" y="252" text-anchor="middle">1.5M</text><polyline class="series" style="stroke:var(--s6)" points="46.0,58.5 111.0,220.4 176.0,140.7 241.0,34.5 306.0,25.6 371.0,46.3 436.0,72.4"/><circle cx="436.0" cy="72.4" r="4" style="fill:var(--s6)"/><text class="endlab" x="443.0" y="76.4">0.0303</text><line class="crosshair" y1="10" y2="236" x1="0" x2="0"/></svg></div><div class="panel"><h2>Policy entropy</h2><div class="unit">nats&nbsp;</div><svg viewBox="0 0 520 260" data-panel='{"x0": 46, "x1": 436, "series": [{"k": "entropy", "v": "s7", "n": "Policy entropy"}]}'><line class="gridline" x1="46" y1="216.1" x2="436" y2="216.1"/><text class="tick" x="40" y="219.1" text-anchor="end">2.4</text><line class="gridline" x1="46" y1="98.3" x2="436" y2="98.3"/><text class="tick" x="40" y="101.3" text-anchor="end">2.45</text><text class="tick" x="105.0" y="252" text-anchor="middle">500k</text><text class="tick" x="229.0" y="252" text-anchor="middle">1.0M</text><text class="tick" x="352.9" y="252" text-anchor="middle">1.5M</text><polyline class="series" style="stroke:var(--s7)" points="46.0,25.6 111.0,60.4 176.0,110.3 241.0,114.9 306.0,147.6 371.0,182.2 436.0,220.4"/><circle cx="436.0" cy="220.4" r="4" style="fill:var(--s7)"/><text class="endlab" x="443.0" y="224.4">2.4</text><line class="crosshair" y1="10" y2="236" x1="0" x2="0"/></svg></div></div>
+<div id="tooltip"></div>
+<details><summary>Data table (last 20 iterations)</summary><table><tr><th>iter</th><th>env_steps</th><th>mean_ep_len</th><th>timeout_rate</th><th>draw_rate</th><th>v_loss</th><th>entropy</th></tr><tr><td>1</td><td>2.621e+05</td><td>48.5</td><td>0</td><td>0.002755</td><td>0.03144</td><td>2.481</td></tr><tr><td>2</td><td>5.243e+05</td><td>194.3</td><td>0.5795</td><td>0.5811</td><td>0.01846</td><td>2.466</td></tr><tr><td>3</td><td>7.864e+05</td><td>114.7</td><td>0.1584</td><td>0.1595</td><td>0.02485</td><td>2.445</td></tr><tr><td>4</td><td>1.049e+06</td><td>118.5</td><td>0.1204</td><td>0.122</td><td>0.03337</td><td>2.443</td></tr><tr><td>5</td><td>1.311e+06</td><td>101.1</td><td>0.06602</td><td>0.06884</td><td>0.03408</td><td>2.429</td></tr><tr><td>6</td><td>1.573e+06</td><td>107.8</td><td>0.07628</td><td>0.07921</td><td>0.03242</td><td>2.414</td></tr><tr><td>7</td><td>1.835e+06</td><td>109.9</td><td>0.09241</td><td>0.09414</td><td>0.03033</td><td>2.398</td></tr></table></details>
+<script>
+const D = {"steps": [262144, 524288, 786432, 1048576, 1310720, 1572864, 1835008], "iter": [1, 2, 3, 4, 5, 6, 7], "mean_ep_len": [48.49862289428711, 194.3033447265625, 114.67181396484375, 118.50794982910156, 101.11875915527344, 107.75859069824219, 109.88199615478516], "timeout_rate": [0.0, 0.5794979333877563, 0.15837621688842773, 0.12042925506830215, 0.06602254509925842, 0.07627829164266586, 0.09240780770778656], "draw_rate": [0.002754820976406336, 0.5810669660568237, 0.1595197319984436, 0.12201907485723495, 0.06884057819843292, 0.07921206951141357, 0.09414316713809967], "v_loss": [0.03144439682364464, 0.018456103280186653, 0.024853616952896118, 0.03336828947067261, 0.034082818776369095, 0.0324237234890461, 0.030330276116728783], "entropy": [2.480865478515625, 2.4660675525665283, 2.444918632507324, 2.4429712295532227, 2.4290807247161865, 2.414405107498169, 2.3981640338897705]};
+const tip = document.getElementById('tooltip');
+const fmt = v => Math.abs(v) >= 1000 ? v.toExponential(2) : (+v.toFixed(3)).toString();
+document.querySelectorAll('svg[data-panel]').forEach(svg => {
+  const meta = JSON.parse(svg.dataset.panel);
+  const ch = svg.querySelector('.crosshair');
+  svg.addEventListener('mousemove', e => {
+    const pt = new DOMPoint(e.clientX, e.clientY).matrixTransform(svg.getScreenCTM().inverse());
+    const fx = (pt.x - meta.x0) / (meta.x1 - meta.x0);
+    if (fx < 0 || fx > 1) { ch.style.opacity = 0; tip.style.opacity = 0; return; }
+    const i = Math.round(fx * (D.steps.length - 1));
+    const px = meta.x0 + (D.steps[i] - D.steps[0]) / (D.steps[D.steps.length-1] - D.steps[0] || 1) * (meta.x1 - meta.x0);
+    ch.setAttribute('x1', px); ch.setAttribute('x2', px); ch.style.opacity = 1;
+    tip.innerHTML = `<div class="row"><b>iter ${D.iter[i]}</b>&nbsp;·&nbsp;${fmt(D.steps[i])} steps</div>` +
+      meta.series.map(s => `<div class="row"><span class="chip" style="background:var(--${s.v})"></span>${s.n}: <b>${fmt(D[s.k][i])}</b></div>`).join('');
+    tip.style.opacity = 1;
+    tip.style.left = (e.clientX + 14) + 'px'; tip.style.top = (e.clientY + 10) + 'px';
+  });
+  svg.addEventListener('mouseleave', () => { ch.style.opacity = 0; tip.style.opacity = 0; });
+});
+</script>
+</body></html>

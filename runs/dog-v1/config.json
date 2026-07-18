@@ -1,0 +1,16 @@
+{
+  "num_envs": 2048,
+  "rollout_len": 128,
+  "num_minibatches": 8,
+  "update_epochs": 4,
+  "lr": 0.0003,
+  "gamma": 0.99,
+  "gae_lambda": 0.95,
+  "clip_eps": 0.2,
+  "vf_coef": 0.5,
+  "ent_coef": 0.01,
+  "max_grad_norm": 0.5,
+  "reset_pool": 2048,
+  "reset_mode": "diverse",
+  "seed": 0
+}
