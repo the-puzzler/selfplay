@@ -94,7 +94,7 @@ def main():
                 trails[i][:] = trails[i][-TRAIL:]
             draw_frame(ax, shown, trails, flash)
             fig.canvas.draw()
-            frame = np.asarray(fig.canvas.buffer_rgba())[..., :3]
+            frame = np.asarray(fig.canvas.buffer_rgba())[..., :3].copy()
             frames.append(frame)
             if bool(done):
                 for _ in range(6):  # linger on the kill
