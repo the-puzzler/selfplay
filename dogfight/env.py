@@ -26,10 +26,10 @@ SHIP_R = 0.045
 ROT_RATE = 3.5  # rad/s
 ACCEL = 1.4
 DRAG = 0.25  # per second
-MUZZLE = 1.5  # bullet speed relative to ship
+MUZZLE = 1.0  # bullet speed relative to ship (slow enough to dodge)
 N_BULLETS = 3  # live bullets per ship
-BULLET_TTL = 14  # steps (~1.4 s)
-COOLDOWN = 5  # steps between shots
+BULLET_TTL = 20  # steps (~2 s; range preserved despite slower bullets)
+COOLDOWN = 8  # steps between shots (a missed shot is a commitment)
 HIT_R = 0.055  # bullet-to-ship kill distance
 WALL_BOUNCE = 0.7  # velocity retained on wall hit
 
@@ -96,10 +96,34 @@ class DogfightEnv:
         bttl = jnp.where(close, 0, bttl)
         return _fresh(pos, vel, th, cd, bpos, bvel, bttl.astype(jnp.int32))
 
+    def _cold_duel_state(self, rng: jax.Array) -> EnvState:
+        """Both ships stationary, guns cold, facing each other at a random
+        distance/orientation — the classic standoff. Without these in the
+        training distribution the policy never learns what to do from a
+        dead stop (v1 turtled there)."""
+        kd, kc, ka, kn = jax.random.split(rng, 4)
+        d = jax.random.uniform(kd, minval=0.3, maxval=1.6)
+        c = jax.random.uniform(kc, (2,), minval=-0.85, maxval=0.85)
+        ang = jax.random.uniform(ka, minval=-jnp.pi, maxval=jnp.pi)
+        offs = 0.5 * d * jnp.array([jnp.cos(ang), jnp.sin(ang)])
+        pos = jnp.clip(jnp.stack([c - offs, c + offs]), -0.95, 0.95)
+        aim = pos[1] - pos[0]
+        th0 = jnp.arctan2(aim[1], aim[0])
+        th = jnp.array([th0, th0 + jnp.pi]) + 0.2 * jax.random.normal(kn, (2,))
+        return _fresh(pos, jnp.zeros((2, 2)), th, jnp.zeros(2, jnp.int32),
+                      jnp.zeros((2, N_BULLETS, 2)), jnp.zeros((2, N_BULLETS, 2)),
+                      jnp.zeros((2, N_BULLETS), jnp.int32))
+
+    COLD_DUEL_FRAC = 0.12
+
     def reset_state(self, rng: jax.Array) -> EnvState:
         if self.reset_mode == "fixed":
             return self._fixed_state(rng)
-        return self._diverse_state(rng)
+        kmode, kd, kr = jax.random.split(rng, 3)
+        duel = self._cold_duel_state(kd)
+        rand = self._diverse_state(kr)
+        use_duel = jax.random.bernoulli(kmode, self.COLD_DUEL_FRAC)
+        return jax.tree.map(lambda a, b: jnp.where(use_duel, a, b), duel, rand)
 
     def reset(self, rng: jax.Array) -> tuple[EnvState, jax.Array]:
         state = self.reset_state(rng)
