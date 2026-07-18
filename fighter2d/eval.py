@@ -67,9 +67,10 @@ def main():
     p.add_argument("--b", required=True, help="checkpoint path or 'random'")
     p.add_argument("--episodes", type=int, default=128, help="per side")
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--reset-mode", choices=["fixed", "diverse"], default="fixed")
     args = p.parse_args()
 
-    env = FighterEnv(reset_mode="fixed")
+    env = FighterEnv(reset_mode=args.reset_mode)
     network = ActorCritic()
     pa = load_params(args.a, network)
     pb = load_params(args.b, network)
