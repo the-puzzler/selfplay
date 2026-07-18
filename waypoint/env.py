@@ -44,7 +44,9 @@ N_BUMPS, N_STEPS, N_GAPS = 6, 4, 2
 GAP_DEPTH = 3.0
 
 # --- task
-WP_MIN, WP_MAX = 1.5, 9.0
+# Floor just above REACH: flags can spawn one lean away (the curriculum's
+# first rung) but never inside the reach radius (no free wins).
+WP_MIN, WP_MAX = 0.7, 9.0
 WP_BEHIND_P = 0.35  # fraction of waypoints spawning behind the stickman
 REACH = 0.6
 # BipedalWalker-style uprightness rule: torso tipping past this angle from
