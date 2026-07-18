@@ -54,7 +54,7 @@ On a rented CUDA box (1x 4090/A100 is plenty):
 git clone https://github.com/the-puzzler/selfplay && cd selfplay
 curl -LsSf https://astral.sh/uv/install.sh | sh && source ~/.local/bin/env
 uv sync --extra cuda
-bash scripts/gpu_run.sh   # diverse-vs-fixed ablation, ~500M steps each
+bash scripts/gpu_run.sh   # one diverse-spawn run, ~500M steps
 ```
 
 Knobs via env vars: `ITERS`, `NUM_ENVS` (default 4096), `ROLLOUT`, `SEED`.
