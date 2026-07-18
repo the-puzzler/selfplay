@@ -64,6 +64,8 @@ def main():
     p.add_argument("--reset-mode", choices=["fixed", "diverse"], default="fixed")
     p.add_argument("--episodes", type=int, default=5)
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--slowmo", type=float, default=1.0,
+                   help="playback slowdown factor; frames are interpolated (2 = half speed)")
     args = p.parse_args()
 
     env = DogfightEnv(reset_mode=args.reset_mode)
@@ -96,18 +98,29 @@ def main():
             flash = int(np.argmin(r)) if r[0] != r[1] else None
             # state is post-auto-reset on done; draw the pre-reset world.
             shown = jax.tree.map(lambda a, b: np.where(done, a, b), prev, state) if done else state
+            n_sub = max(1, round(2 * args.slowmo))  # 20fps playback => slowmo x exactly
+            for sub in range(n_sub):
+                # Interpolate ship/bullet positions between physics steps.
+                f = (sub + 1) / n_sub
+                interp = jax.tree.map(
+                    lambda a, b: np.asarray(a) * (1 - f) + np.asarray(b) * f, prev, shown
+                )
+                tr = trails.copy()
+                for i in range(2):
+                    trails_i = trails[i] + [np.asarray(interp.pos[i]).copy()]
+                    tr[i] = trails_i[-TRAIL:]
+                draw_frame(ax, interp, tr, flash if sub == n_sub - 1 else None)
+                fig.canvas.draw()
+                frame = np.asarray(fig.canvas.buffer_rgba())[..., :3].copy()
+                frames.append(frame)
             for i in range(2):
                 trails[i].append(np.asarray(shown.pos[i]).copy())
                 trails[i][:] = trails[i][-TRAIL:]
-            draw_frame(ax, shown, trails, flash)
-            fig.canvas.draw()
-            frame = np.asarray(fig.canvas.buffer_rgba())[..., :3].copy()
-            frames.append(frame)
             if bool(done):
-                for _ in range(6):  # linger on the kill
+                for _ in range(4 * n_sub):  # linger on the kill
                     frames.append(frame)
                 break
-    imageio.mimsave(args.out, frames, fps=15)
+    imageio.mimsave(args.out, frames, fps=20)
     print(f"wrote {len(frames)} frames -> {args.out}")
 
 
