@@ -15,7 +15,7 @@ import numpy as np
 from flax import serialization
 
 from fighter2d import model as fmodel
-from fighter2d.env import EPISODE_LEN, N_FRAMES, OBS_DIM, FighterEnv
+from fighter2d.env import DOWN_Z, EPISODE_LEN, N_FRAMES, OBS_DIM, FighterEnv
 from fighter2d.ppo import ActorCritic, policy_act
 
 
@@ -61,7 +61,7 @@ def main():
             frames.append(renderer.render())
             z = fmodel.TORSO_INIT_Z + np.array([d.qpos[0 + 1], d.qpos[13 + 1]])
             x = np.array(fmodel.INIT_X) + np.array([d.qpos[0], d.qpos[13]])
-            if (z < 0.5).any() or (np.abs(x) > fmodel.ARENA_HALF).any():
+            if (z < DOWN_Z).any() or (np.abs(x) > fmodel.ARENA_HALF).any():
                 break
     imageio.mimsave(args.out, frames, fps=25)
     print(f"wrote {len(frames)} frames -> {args.out}")

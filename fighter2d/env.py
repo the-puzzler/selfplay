@@ -29,7 +29,7 @@ from fighter2d import model as fmodel
 
 N_FRAMES = 5  # control dt = 5 * 0.008 = 0.04s
 EPISODE_LEN = 300  # 12 seconds
-DOWN_Z = 0.5  # torso center below this => downed
+DOWN_Z = 0.25  # torso center below this => downed (crouched stances stay legal)
 NQ = fmodel.NQ_PER_FIGHTER  # 13 per fighter
 NU = fmodel.NU_PER_FIGHTER  # 10 per fighter
 OBS_DIM = 55
