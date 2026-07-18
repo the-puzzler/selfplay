@@ -1,0 +1,19 @@
+{
+  "num_envs": 256,
+  "rollout_len": 64,
+  "num_minibatches": 8,
+  "update_epochs": 4,
+  "lr": 0.0003,
+  "gamma": 0.995,
+  "gae_lambda": 0.95,
+  "clip_eps": 0.2,
+  "vf_coef": 0.5,
+  "ent_coef": 0.003,
+  "max_grad_norm": 0.5,
+  "reset_pool": 1024,
+  "archive_frac": 0.0,
+  "archive_size": 4096,
+  "archive_write_prob": 0.01,
+  "reset_mode": "diverse",
+  "seed": 0
+}

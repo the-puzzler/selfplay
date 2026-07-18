@@ -44,7 +44,22 @@ uv run python -m fighter2d.render --ckpt runs/diverse/ckpt_final.msgpack --out f
 ```
 
 Runs on CPU (slow, fine for smoke tests); the same code jits to GPU/TPU
-unchanged — rent an NVIDIA box and crank `--num-envs`.
+unchanged.
+
+## GPU (the real experiment)
+
+On a rented CUDA box (1x 4090/A100 is plenty):
+
+```bash
+git clone https://github.com/the-puzzler/selfplay && cd selfplay
+curl -LsSf https://astral.sh/uv/install.sh | sh && source ~/.local/bin/env
+uv sync --extra cuda
+bash scripts/gpu_run.sh   # diverse-vs-fixed ablation, ~500M steps each
+```
+
+Knobs via env vars: `ITERS`, `NUM_ENVS` (default 4096), `ROLLOUT`, `SEED`.
+Expect 4096 envs to be roughly 100-500x CPU throughput; the script ends
+with the head-to-head eval and rendered videos.
 
 ## Roadmap
 
