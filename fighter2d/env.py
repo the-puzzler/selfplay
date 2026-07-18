@@ -102,10 +102,20 @@ class FighterEnv:
             lambda a, b: jnp.where(use_standing, a, b), standing, random_
         )
 
+    MIN_SEPARATION = 0.4  # torso centers; close enough for limb contact, no interpenetration
+
     def reset_qpos_qvel(self, rng: jax.Array) -> tuple[jax.Array, jax.Array]:
         r0, r1 = jax.random.split(rng)
         q0, v0 = self._fighter_reset(r0, 0)
         q1, v1 = self._fighter_reset(r1, 1)
+        # Push torsos apart to MIN_SEPARATION if they spawned overlapping.
+        x0 = self.init_x[0] + q0[0]
+        x1 = self.init_x[1] + q1[0]
+        d = x1 - x0
+        deficit = jnp.maximum(self.MIN_SEPARATION - jnp.abs(d), 0.0)
+        shift = 0.5 * deficit * jnp.sign(d + 1e-8)
+        q0 = q0.at[0].set(jnp.clip(x0 - shift, -2.2, 2.2) - self.init_x[0])
+        q1 = q1.at[0].set(jnp.clip(x1 + shift, -2.2, 2.2) - self.init_x[1])
         return jnp.concatenate([q0, q1]), jnp.concatenate([v0, v1])
 
     def reset(self, rng: jax.Array) -> tuple[EnvState, jax.Array]:
