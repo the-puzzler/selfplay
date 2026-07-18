@@ -14,7 +14,8 @@ machinery in a cheap 2D env.
 
 Two planar stick-figure bipeds (torso, head, 2 legs, 2 arms — 13 dof / 10
 actuators each) in an MJX arena. You lose by falling (torso center below
-0.25m — crouched stances are legal) or leaving the arena. Reward is **purely sparse and zero-sum**: ±1 at episode
+0.5m — a 0.25m threshold was tried and agents learned to camp in a stable
+floor-hugging brace for guaranteed draws) or leaving the arena. Reward is **purely sparse and zero-sum**: ±1 at episode
 end, nothing else. No shaping of any kind.
 
 - `model.py` — MuJoCo XML builder
