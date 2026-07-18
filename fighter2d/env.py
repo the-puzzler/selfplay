@@ -70,7 +70,9 @@ class FighterEnv:
         kx, kz, ka, kj, ks, kv1, kv2 = jax.random.split(rng, 7)
         x_abs = jax.random.uniform(kx, minval=-2.4, maxval=2.4)
         z_abs = jax.random.uniform(kz, minval=0.15, maxval=1.8)
-        angle = jax.random.uniform(ka, minval=-jnp.pi, maxval=jnp.pi)
+        # Upright-ish spawns: lean up to ~34 degrees, never sideways/inverted
+        # (deliberate compute-focusing constraint for CPU-scale runs).
+        angle = jax.random.uniform(ka, minval=-0.6, maxval=0.6)
         limbs = jax.random.uniform(kj, (NQ - 3,), minval=self.limb_lo, maxval=self.limb_hi)
         qpos = jnp.concatenate(
             [
@@ -144,7 +146,7 @@ class FighterEnv:
         return dx, dz, r
 
     def reset_qpos_qvel(self, rng: jax.Array) -> tuple[jax.Array, jax.Array]:
-        r0, r1 = jax.random.split(rng)
+        r0, r1, rplace = jax.random.split(rng, 3)
         q0, v0 = self._fighter_reset(r0, 0)
         q1, v1 = self._fighter_reset(r1, 1)
 
@@ -165,22 +167,24 @@ class FighterEnv:
             else:
                 q1 = q
 
-        # Separate fighters so their horizontal reach intervals are disjoint:
-        # no fighter-fighter interpenetration at spawn, by construction.
-        ext0 = jnp.max(jnp.abs(dx0) + rad0)
-        ext1 = jnp.max(jnp.abs(dx1) + rad1)
-        min_sep = ext0 + ext1 + self.SPAWN_GAP
-        x0 = self.init_x[0] + q0[0]
-        x1 = self.init_x[1] + q1[0]
-        d = x1 - x0
-        s = jnp.where(d >= 0, 1.0, -1.0)
-        too_close = jnp.abs(d) < min_sep
-        half = 0.5 * min_sep
-        c = jnp.clip(0.5 * (x0 + x1), -(2.4 - half), 2.4 - half)
-        new_x0 = jnp.where(too_close, c - s * half, x0)
-        new_x1 = jnp.where(too_close, c + s * half, x1)
-        q0 = q0.at[0].set(new_x0 - self.init_x[0])
-        q1 = q1.at[0].set(new_x1 - self.init_x[1])
+        if self.reset_mode == "diverse":
+            # Place the pair with random separation (never overlapping: the
+            # minimum is the poses' combined reach), random arena position,
+            # random side assignment. Sampling separation directly avoids the
+            # old artifact where close pairs snapped to exactly min_sep.
+            ext0 = jnp.max(jnp.abs(dx0) + rad0)
+            ext1 = jnp.max(jnp.abs(dx1) + rad1)
+            min_sep = ext0 + ext1 + self.SPAWN_GAP
+            ksep, kc, kside = jax.random.split(rplace, 3)
+            sep = jax.random.uniform(ksep, minval=min_sep, maxval=4.8)
+            half = 0.5 * sep
+            cmax = 2.4 - half
+            c = jax.random.uniform(kc, minval=-cmax, maxval=cmax)
+            side = jnp.where(jax.random.bernoulli(kside), 1.0, -1.0)
+            new_x0 = c - side * half
+            new_x1 = c + side * half
+            q0 = q0.at[0].set(new_x0 - self.init_x[0])
+            q1 = q1.at[0].set(new_x1 - self.init_x[1])
         return jnp.concatenate([q0, q1]), jnp.concatenate([v0, v1])
 
     def reset(self, rng: jax.Array) -> tuple[EnvState, jax.Array]:
