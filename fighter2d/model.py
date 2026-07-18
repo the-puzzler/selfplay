@@ -99,6 +99,7 @@ def _actuators(prefix: str) -> str:
 def build_xml() -> str:
     return f"""
 <mujoco model="fighter2d">
+  <compiler angle="radian"/>
   <option timestep="0.008" iterations="8" ls_iterations="8"/>
   <visual>
     <global offwidth="1280" offheight="720"/>
