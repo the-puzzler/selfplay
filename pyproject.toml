@@ -3,7 +3,14 @@ name = "selfplay"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 dependencies = [
-    "torch>=2.8.0",
+    "flax>=0.10",
+    "imageio>=2.37.3",
+    "imageio-ffmpeg>=0.6.0",
+    "jax>=0.4.35",
+    "mujoco>=3.2.5",
+    "mujoco-mjx>=3.2.5",
+    "numpy>=2.5.1",
+    "optax>=0.2",
 ]
