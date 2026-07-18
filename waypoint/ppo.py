@@ -32,7 +32,9 @@ class RecurrentAC(nn.Module):
         h, out = nn.GRUCell(features=HIDDEN)(h, e)
         a = nn.tanh(nn.Dense(128)(out))
         mean = nn.Dense(self.act_dim, kernel_init=nn.initializers.orthogonal(0.01))(a)
-        log_std = self.param("log_std", nn.initializers.constant(-0.5), (self.act_dim,))
+        log_std = jnp.clip(
+            self.param("log_std", nn.initializers.constant(-0.5), (self.act_dim,)),
+            -4.0, 1.0)
         v = nn.tanh(nn.Dense(128)(out))
         value = nn.Dense(1)(v).squeeze(-1)
         return h, mean, log_std, value
@@ -94,7 +96,7 @@ def make_train_iter(env: WaypointEnv, cfg):
         _, (mean, log_std, value) = jax.lax.scan(
             scan_net, h0, (obs, done_prev.astype(jnp.float32)))
         log_prob = gaussian_log_prob(mean, log_std, action)
-        ratio = jnp.exp(log_prob - old_lp)
+        ratio = jnp.exp(jnp.clip(log_prob - old_lp, -20.0, 20.0))
         adv_n = (adv - adv.mean()) / (adv.std() + 1e-8)
         pg1 = ratio * adv_n
         pg2 = jnp.clip(ratio, 1 - cfg["clip_eps"], 1 + cfg["clip_eps"]) * adv_n
@@ -179,7 +181,7 @@ DEFAULT_CFG = {
     "num_envs": 512,
     "rollout_len": 128,
     "num_minibatches": 4,
-    "update_epochs": 3,
+    "update_epochs": 2,
     "lr": 3e-4,
     "gamma": 0.995,
     "gae_lambda": 0.95,
