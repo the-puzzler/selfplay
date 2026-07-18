@@ -59,48 +59,34 @@ class FighterEnv:
 
     # ---------------------------------------------------------------- resets
 
-    def _standing_qpos(self, rng: jax.Array, fi: int) -> tuple[jax.Array, jax.Array]:
-        """Near-canonical standing pose for fighter fi (13,) qpos/qvel."""
-        k1, k2, k3 = jax.random.split(rng, 3)
-        qpos = jnp.zeros(NQ)
-        qpos = qpos.at[2].set(0.25 * jax.random.normal(k1))  # slight lean
-        qpos = qpos.at[3:].set(0.3 * jax.random.normal(k2, (NQ - 3,)))
-        qvel = 0.1 * jax.random.normal(k3, (NQ,))
-        return qpos, qvel
-
     def _random_qpos(self, rng: jax.Array, fi: int) -> tuple[jax.Array, jax.Array]:
-        """Fully randomized configuration for fighter fi."""
-        kx, kz, ka, kj, kv = jax.random.split(rng, 5)
-        x_abs = jax.random.uniform(kx, minval=-2.0, maxval=2.0)
-        z_abs = jax.random.uniform(kz, minval=0.45, maxval=1.6)
+        """Fully randomized configuration for fighter fi: anywhere in the
+        arena, any height from lying on the floor to mid-air, any root
+        orientation, joints anywhere in their ranges, velocity intensity
+        from stillness to violent tumbling. No curated sub-distributions."""
+        kx, kz, ka, kj, ks, kv1, kv2 = jax.random.split(rng, 7)
+        x_abs = jax.random.uniform(kx, minval=-2.4, maxval=2.4)
+        z_abs = jax.random.uniform(kz, minval=0.15, maxval=1.8)
         angle = jax.random.uniform(ka, minval=-jnp.pi, maxval=jnp.pi)
-        limbs = jax.random.uniform(
-            kj, (NQ - 3,), minval=0.9 * self.limb_lo, maxval=0.9 * self.limb_hi
-        )
+        limbs = jax.random.uniform(kj, (NQ - 3,), minval=self.limb_lo, maxval=self.limb_hi)
         qpos = jnp.concatenate(
             [
                 jnp.array([x_abs - self.init_x[fi], z_abs - self.base_z, angle]),
                 limbs,
             ]
         )
-        kv1, kv2 = jax.random.split(kv)
-        qvel = jnp.concatenate(
-            [1.0 * jax.random.normal(kv1, (3,)), 2.0 * jax.random.normal(kv2, (NQ - 3,))]
+        vel_scale = jax.random.uniform(ks)
+        qvel = vel_scale * jnp.concatenate(
+            [2.0 * jax.random.normal(kv1, (3,)), 4.0 * jax.random.normal(kv2, (NQ - 3,))]
         )
         return qpos, qvel
 
     def _fighter_reset(self, rng: jax.Array, fi: int) -> tuple[jax.Array, jax.Array]:
+        k = jax.random.fold_in(rng, fi)
         if self.reset_mode == "fixed":
-            k = jax.random.fold_in(rng, fi)
             qpos = 0.01 * jax.random.normal(k, (NQ,))
             return qpos, jnp.zeros(NQ)
-        kmode, kpose = jax.random.split(jax.random.fold_in(rng, fi))
-        standing = self._standing_qpos(kpose, fi)
-        random_ = self._random_qpos(kpose, fi)
-        use_standing = jax.random.bernoulli(kmode, 0.5)
-        return jax.tree.map(
-            lambda a, b: jnp.where(use_standing, a, b), standing, random_
-        )
+        return self._random_qpos(k, fi)
 
     MIN_SEPARATION = 0.4  # torso centers; close enough for limb contact, no interpenetration
 
@@ -108,14 +94,19 @@ class FighterEnv:
         r0, r1 = jax.random.split(rng)
         q0, v0 = self._fighter_reset(r0, 0)
         q1, v1 = self._fighter_reset(r1, 1)
-        # Push torsos apart to MIN_SEPARATION if they spawned overlapping.
+        # If torsos spawned closer than MIN_SEPARATION, respread them around
+        # their (arena-clamped) midpoint; otherwise leave positions untouched.
         x0 = self.init_x[0] + q0[0]
         x1 = self.init_x[1] + q1[0]
         d = x1 - x0
-        deficit = jnp.maximum(self.MIN_SEPARATION - jnp.abs(d), 0.0)
-        shift = 0.5 * deficit * jnp.sign(d + 1e-8)
-        q0 = q0.at[0].set(jnp.clip(x0 - shift, -2.2, 2.2) - self.init_x[0])
-        q1 = q1.at[0].set(jnp.clip(x1 + shift, -2.2, 2.2) - self.init_x[1])
+        s = jnp.where(d >= 0, 1.0, -1.0)
+        too_close = jnp.abs(d) < self.MIN_SEPARATION
+        c = jnp.clip(0.5 * (x0 + x1), -2.2, 2.2)
+        half = 0.5 * self.MIN_SEPARATION
+        new_x0 = jnp.where(too_close, c - s * half, x0)
+        new_x1 = jnp.where(too_close, c + s * half, x1)
+        q0 = q0.at[0].set(new_x0 - self.init_x[0])
+        q1 = q1.at[0].set(new_x1 - self.init_x[1])
         return jnp.concatenate([q0, q1]), jnp.concatenate([v0, v1])
 
     def reset(self, rng: jax.Array) -> tuple[EnvState, jax.Array]:
