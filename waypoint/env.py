@@ -24,16 +24,31 @@ GRAVITY = 9.8
 DAMPING = 0.995
 V_MAX = 8.0
 
-# --- body (identical to stickfight)
-N_PTS = 11
-SEG_AI = (1, 2, 1, 3, 1, 5, 2, 7, 2, 9)
-SEG_BI = (0, 1, 3, 4, 5, 6, 7, 8, 9, 10)
+# --- body: stickfight stickman + real FEET (heel-ankle-toe rigid lines,
+# ankle motors). Point-feet made static balance impossible; forward-only
+# feet tip backward. A heel puts the support polygon around the ankle.
+# pts: 0 head 1 neck 2 pelvis 3 elbL 4 handL 5 elbR 6 handR
+#      7 kneeL 8 ankleL 9 kneeR 10 ankleR 11 toeL 12 toeR 13 heelL 14 heelR
+N_PTS = 15
+SEG_AI = (1, 2, 1, 3, 1, 5, 2, 7, 2, 9, 8, 10, 8, 10, 13, 14)
+SEG_BI = (0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 11, 12)
 SEG_A = jnp.array(SEG_AI)
 SEG_B = jnp.array(SEG_BI)
-SEG_LEN = jnp.array([0.25, 0.60, 0.32, 0.30, 0.32, 0.30, 0.45, 0.45, 0.45, 0.45])
+# Foot = stiff TRIANGLE (ankle raised 0.05 above the heel-toe line);
+# a collinear heel-ankle-toe line is singular in PBD and explodes.
+SEG_LEN = jnp.array([0.25, 0.60, 0.32, 0.30, 0.32, 0.30,
+                     0.45, 0.45, 0.45, 0.45,
+                     0.13, 0.13, 0.1118, 0.1118, 0.22, 0.22])
 JOINTS = ((1, 2, 1, 3), (2, 3, 3, 4), (1, 4, 1, 5), (4, 5, 5, 6),
-          (1, 6, 2, 7), (6, 7, 7, 8), (1, 8, 2, 9), (8, 9, 9, 10))
-N_JOINTS = 8
+          (1, 6, 2, 7), (6, 7, 7, 8), (1, 8, 2, 9), (8, 9, 9, 10),
+          (7, 10, 8, 11), (9, 11, 10, 12))
+# Points each motor rotates: the FULL downstream subtree (rotating only the
+# immediate distal point tears the constraints of everything past it — the
+# solver's violent repairs were shaking the body apart).
+SUBTREES = ((3, 4), (4,), (5, 6), (6,),
+            (7, 8, 11, 13), (8, 11, 13), (9, 10, 12, 14), (10, 12, 14),
+            (11, 13), (12, 14))
+N_JOINTS = 10
 MOTOR_SPEED = 5.0
 MOTOR_GAIN = 0.5
 
@@ -49,18 +64,18 @@ GAP_DEPTH = 3.0
 WP_MIN, WP_MAX = 0.7, 9.0
 WP_BEHIND_P = 0.35  # fraction of waypoints spawning behind the stickman
 REACH = 0.6
-# BipedalWalker-style uprightness rule: torso tipping past this angle from
-# vertical ends the episode (a fail, reward 0). Kills tumbling gaits as a
-# strategy without any reward shaping — it's a rule, not a bonus.
+# Uprightness rule (BipedalWalker-style): the instant the torso passes
+# TIP_LIMIT the episode ends as a fail. No grace, no persistence window —
+# v5's amnesty became a kamikaze-cartwheel license. Fair only because the
+# body has feet (a support polygon) and spawns are supportive.
 TIP_LIMIT = 1.3  # rad (~75 degrees)
-TIP_GRACE = 15  # ticks before the tip rule arms (spawn wobble amnesty)
 # PARTIAL observation: terrain visible only within ~2 units of the body.
 # Waypoints can be 9 units out — the terrain between must be discovered by
 # traveling and REMEMBERED (the recurrent policy's job). The waypoint
 # itself is a compass reading (signed distance), not a visual.
 TERRAIN_OFFS = jnp.array([-1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 2.0])
 
-OBS_DIM = 55
+OBS_DIM = 71  # 1 + 2*15 pts + 2*15 vels + 8 terrain + compass + time
 ACT_DIM = N_JOINTS
 
 
@@ -114,6 +129,7 @@ class WaypointEnv:
     # -------------------------------------------------------------- resets
 
     def _pose_pts(self, root, torso_ang, jangles):
+        """jangles (10,): shL elL shR elR hipL knL hipR knR ankL ankR."""
         up = jnp.stack([-jnp.sin(torso_ang), jnp.cos(torso_ang)])
 
         def rot(v, a):
@@ -128,17 +144,24 @@ class WaypointEnv:
             ua = rot(up, jangles[sh])
             elbow = neck + 0.32 * ua
             pts += [elbow, elbow + 0.30 * rot(ua, jangles[el])]
-        for hip, kn in ((4, 5), (6, 7)):
+        toes, heels = [], []
+        for hip, kn, ank in ((4, 5, 8), (6, 7, 9)):
             th = rot(up, jangles[hip])
             knee = pelvis + 0.45 * th
-            pts += [knee, knee + 0.45 * rot(th, jangles[kn])]
-        return jnp.stack(pts)
+            sh_dir = rot(th, jangles[kn])
+            ankle = knee + 0.45 * sh_dir
+            fdir = rot(sh_dir, jangles[ank] + jnp.pi / 2)
+            fdown = 0.05 * sh_dir  # sole sits below the ankle
+            pts += [knee, ankle]
+            toes.append(ankle + 0.12 * fdir + fdown)
+            heels.append(ankle - 0.10 * fdir + fdown)
+        return jnp.stack(pts + toes + heels)
 
     def reset_state(self, rng: jax.Array) -> EnvState:
         kt, kp, ka, kj, kv, kc, kw = jax.random.split(rng, 7)
         h = self._terrain(kt)
         if self.reset_mode == "fixed":
-            jang = jnp.array([jnp.pi, 0.0, jnp.pi, 0.0, jnp.pi, 0.0, jnp.pi, 0.0])
+            jang = jnp.array([jnp.pi, 0.0, jnp.pi, 0.0, jnp.pi, 0.0, jnp.pi, 0.0, 0.0, 0.0])
             pts = self._pose_pts(jnp.array([0.0, 0.95]), 0.0, jang)
             vel = jnp.zeros((N_PTS, 2))
             wp_dx = 5.0
@@ -148,9 +171,11 @@ class WaypointEnv:
             tang = jax.random.uniform(ka, minval=-0.25, maxval=0.25)
             kj1, kj2 = jax.random.split(kj)
             arms = jax.random.uniform(kj1, (4,), minval=-jnp.pi, maxval=jnp.pi)
-            legs = jax.random.uniform(kj2, (4,), minval=-0.5, maxval=0.5)
+            kj2a, kj2b = jax.random.split(kj2)
+            legs = jax.random.uniform(kj2a, (4,), minval=-0.5, maxval=0.5)
             legs = legs.at[jnp.array([0, 2])].add(jnp.pi)  # hips point down
-            jang = jnp.concatenate([arms, legs])
+            ankles = jax.random.uniform(kj2b, (2,), minval=-0.4, maxval=0.4)
+            jang = jnp.concatenate([arms, legs, ankles])
             z = jax.random.uniform(kp, minval=0.85, maxval=1.15)
             pts = self._pose_pts(jnp.array([0.0, z]), tang, jang)
             scale = 0.5 * jax.random.uniform(kc)
@@ -173,21 +198,31 @@ class WaypointEnv:
 
     # ------------------------------------------------------------- physics
 
-    def _motors(self, pts, action):
-        pts0 = pts
+    def _motors(self, pts, prev, action):
+        """Rotate each joint's subtree toward its target angle. The SAME
+        rotation is applied to prev positions: motor moves carry no phantom
+        Verlet velocity (teleporting only pts injects several m/s per
+        substep and shakes the body apart)."""
         for j in range(N_JOINTS):
-            pseg, cseg, pivot, distal = JOINTS[j]
+            pseg, cseg, pivot, _ = JOINTS[j]
             pdir = pts[SEG_BI[pseg]] - pts[SEG_AI[pseg]]
             cdir = pts[SEG_BI[cseg]] - pts[SEG_AI[cseg]]
             ang = jnp.arctan2(pdir[0] * cdir[1] - pdir[1] * cdir[0], (pdir * cdir).sum())
             target = action[j] * jnp.pi
             delta = jnp.clip(MOTOR_GAIN * _wrap(target - ang),
                              -MOTOR_SPEED * DT, MOTOR_SPEED * DT)
-            rel = pts[distal] - pts[pivot]
             c, s = jnp.cos(delta), jnp.sin(delta)
-            rot = jnp.stack([c * rel[0] - s * rel[1], s * rel[0] + c * rel[1]])
-            pts = pts.at[distal].set(pts[pivot] + rot)
-        return pts - (pts - pts0).mean(axis=0, keepdims=True)
+            sub = jnp.array(SUBTREES[j])
+            for arr_name in (0, 1):
+                arr = pts if arr_name == 0 else prev
+                rel = arr[sub] - arr[pivot]
+                rot = jnp.stack([c * rel[:, 0] - s * rel[:, 1],
+                                 s * rel[:, 0] + c * rel[:, 1]], axis=-1)
+                if arr_name == 0:
+                    pts = pts.at[sub].set(pts[pivot] + rot)
+                else:
+                    prev = prev.at[sub].set(prev[pivot] + rot)
+        return pts, prev
 
     def _constraints(self, pts):
         for _ in range(6):
@@ -205,7 +240,7 @@ class WaypointEnv:
         vel = vel * jnp.minimum(V_MAX * DT / speed, 1.0)
         new = pts + vel + jnp.array([0.0, -GRAVITY]) * DT * DT
         prev = pts
-        new = self._motors(new, action)
+        new, prev = self._motors(new, prev, action)
         new = self._constraints(new)
         # terrain contact (vertical projection heightfield)
         ground = _height(h, new[:, 0])
@@ -245,7 +280,7 @@ class WaypointEnv:
         reached = jnp.linalg.norm(pts[2] - s.wp) < REACH
         torso = pts[1] - pts[2]  # pelvis -> neck
         tipped = jnp.abs(jnp.arctan2(torso[0], torso[1])) > TIP_LIMIT
-        tipped = tipped & ~reached & (t > TIP_GRACE)
+        tipped = tipped & ~reached
         timeout = t >= EPISODE_LEN
         done = reached | timeout | tipped
         reward = reached.astype(jnp.float32)
