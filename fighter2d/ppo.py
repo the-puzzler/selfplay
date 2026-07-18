@@ -55,15 +55,32 @@ def make_train_iter(env: FighterEnv, cfg):
     v_step = jax.vmap(env.step)
 
     def rollout_step(carry, _):
-        params, env_state, obs, rng = carry
-        rng, k_act, k_step = jax.random.split(rng, 3)
+        params, env_state, obs, rng, pool, archive = carry
+        pool_qpos, pool_qvel = pool
+        arch_qpos, arch_qvel = archive
+        E = cfg["num_envs"]
+        rng, k_act, k_step, k_idx, k_wr, k_slot = jax.random.split(rng, 6)
         mean, log_std, value = network.apply(params, obs)  # obs (E,2,O)
         action = mean + jnp.exp(log_std) * jax.random.normal(k_act, mean.shape)
         log_prob = gaussian_log_prob(mean, log_std, action)
-        step_keys = jax.random.split(k_step, cfg["num_envs"])
-        env_state, next_obs, reward, done, info = v_step(step_keys, env_state, action)
+        step_keys = jax.random.split(k_step, E)
+        # Episodes ending this step reset to a random pre-sampled pool state
+        # (spawn sampling is expensive; the pool amortizes it per iteration).
+        idx = jax.random.randint(k_idx, (E,), 0, cfg["reset_pool"])
+        env_state, next_obs, reward, done, info = v_step(
+            step_keys, env_state, action, pool_qpos[idx], pool_qvel[idx]
+        )
+        # Harvest visited-state snapshots of live envs into the archive.
+        wr = jax.random.bernoulli(k_wr, cfg["archive_write_prob"], (E,)) & ~done
+        slots = jax.random.randint(k_slot, (E,), 0, cfg["archive_size"])
+        arch_qpos = arch_qpos.at[slots].set(
+            jnp.where(wr[:, None], env_state.data.qpos, arch_qpos[slots])
+        )
+        arch_qvel = arch_qvel.at[slots].set(
+            jnp.where(wr[:, None], env_state.data.qvel, arch_qvel[slots])
+        )
         trans = Transition(obs, action, log_prob, value, reward, done)
-        return (params, env_state, next_obs, rng), (trans, info)
+        return (params, env_state, next_obs, rng, pool, (arch_qpos, arch_qvel)), (trans, info)
 
     def compute_gae(traj: Transition, last_value):
         def scan_fn(carry, t):
@@ -94,10 +111,24 @@ def make_train_iter(env: FighterEnv, cfg):
         return loss, {"pg_loss": pg_loss, "v_loss": v_loss, "entropy": entropy}
 
     def train_iter(runner_state):
-        params, opt_state, env_state, obs, rng = runner_state
+        params, opt_state, env_state, obs, rng, archive = runner_state
 
-        (params_, env_state, last_obs, rng), (traj, infos) = jax.lax.scan(
-            rollout_step, (params, env_state, obs, rng), None, length=cfg["rollout_len"]
+        # Build this iteration's reset pool: fresh procedural spawns, with an
+        # optional fraction of archived visited states mixed in.
+        rng, k_pool, k_mix, k_aidx = jax.random.split(rng, 4)
+        P = cfg["reset_pool"]
+        pool_qpos, pool_qvel = jax.vmap(env.reset_qpos_qvel)(jax.random.split(k_pool, P))
+        if cfg["archive_frac"] > 0:
+            arch_qpos, arch_qvel = archive
+            mix = jax.random.bernoulli(k_mix, cfg["archive_frac"], (P,))
+            aidx = jax.random.randint(k_aidx, (P,), 0, cfg["archive_size"])
+            pool_qpos = jnp.where(mix[:, None], arch_qpos[aidx], pool_qpos)
+            pool_qvel = jnp.where(mix[:, None], arch_qvel[aidx], pool_qvel)
+        pool = (pool_qpos, pool_qvel)
+
+        (params_, env_state, last_obs, rng, pool, archive), (traj, infos) = jax.lax.scan(
+            rollout_step, (params, env_state, obs, rng, pool, archive), None,
+            length=cfg["rollout_len"],
         )
         _, _, last_value = network.apply(params, last_obs)
         adv, target = compute_gae(traj, last_value)
@@ -149,7 +180,7 @@ def make_train_iter(env: FighterEnv, cfg):
             "v_loss": aux["v_loss"].mean(),
             "entropy": aux["entropy"].mean(),
         }
-        return (params, opt_state, env_state, last_obs, rng), metrics
+        return (params, opt_state, env_state, last_obs, rng, archive), metrics
 
     tx = optax.chain(
         optax.clip_by_global_norm(cfg["max_grad_norm"]),
@@ -157,12 +188,16 @@ def make_train_iter(env: FighterEnv, cfg):
     )
 
     def init(rng):
-        rng, k_net, k_reset = jax.random.split(rng, 3)
+        rng, k_net, k_reset, k_arch = jax.random.split(rng, 4)
         params = network.init(k_net, jnp.zeros((1, OBS_DIM)))
         opt_state = tx.init(params)
         reset_keys = jax.random.split(k_reset, cfg["num_envs"])
         env_state, obs = jax.vmap(env.reset)(reset_keys)
-        return params, opt_state, env_state, obs, rng
+        # Archive starts as procedural spawns; play overwrites it with
+        # genuinely visited states (tangles, clinches, mid-throws included).
+        arch_keys = jax.random.split(k_arch, cfg["archive_size"])
+        arch_qpos, arch_qvel = jax.vmap(env.reset_qpos_qvel)(arch_keys)
+        return params, opt_state, env_state, obs, rng, (arch_qpos, arch_qvel)
 
     return init, jax.jit(train_iter), network
 
@@ -179,6 +214,13 @@ DEFAULT_CFG = {
     "vf_coef": 0.5,
     "ent_coef": 0.003,
     "max_grad_norm": 0.5,
+    # Resets are drawn from a pool pre-sampled once per iteration.
+    "reset_pool": 1024,
+    # Visited-state archive resets, mixed into the pool (0.0 = disabled;
+    # spawns stay purely procedural).
+    "archive_frac": 0.0,
+    "archive_size": 4096,
+    "archive_write_prob": 0.01,
 }
 
 
