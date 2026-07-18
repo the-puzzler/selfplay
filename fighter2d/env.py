@@ -88,21 +88,89 @@ class FighterEnv:
             return qpos, jnp.zeros(NQ)
         return self._random_qpos(k, fi)
 
-    MIN_SEPARATION = 0.4  # torso centers; close enough for limb contact, no interpenetration
+    SPAWN_GAP = 0.02  # clearance between fighters' reach intervals and above floor
+
+    def _fighter_frame(self, q: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
+        """Forward kinematics of one fighter's capsule endpoints, relative to
+        the root. Returns (dx, dz, radius) arrays. Planar chain: a body-frame
+        offset (bx, bz) rotated about +y by angle a maps to
+        (bx*cos a + bz*sin a, -bx*sin a + bz*cos a)."""
+        th = q[2]
+
+        def rot(a, bx, bz):
+            return bx * jnp.cos(a) + bz * jnp.sin(a), -bx * jnp.sin(a) + bz * jnp.cos(a)
+
+        pts = []  # (dx, dz, r)
+        for bz, r in ((0.2, 0.07), (-0.2, 0.07), (0.32, 0.09)):  # torso ends, head
+            dx, dz = rot(th, 0.0, bz)
+            pts.append((jnp.full(1, dx), jnp.full(1, dz), jnp.full(1, r)))
+
+        def chain(base_bz, offsets_r):
+            """offsets_r: [(angles, bx, bz, radius), ...] cumulative chain for
+            both limbs of a pair at once (angles shape (2,))."""
+            bx0, bz0 = rot(th, 0.0, base_bz)
+            pos = (jnp.full(2, bx0), jnp.full(2, bz0))
+            acc = th
+            for ang, bx, bz, r in offsets_r:
+                acc = acc + ang
+                dx, dz = rot(acc, bx, bz)
+                pos = (pos[0] + dx, pos[1] + dz)
+                pts.append((pos[0], pos[1], jnp.full(2, r)))
+            return pos
+
+        hips, knees, ankles = q[jnp.array([3, 6])], q[jnp.array([4, 7])], q[jnp.array([5, 8])]
+        # Feet: two endpoints; append the -x end manually after the chain.
+        foot_pos = chain(-0.2, [
+            (hips, 0.0, -0.45, 0.05),   # knee (thigh end)
+            (knees, 0.0, -0.5, 0.045),  # ankle
+            (ankles, 0.1, 0.0, 0.045),  # foot +x end
+        ])
+        foot_ang = th + hips + knees + ankles
+        bdx, bdz = rot(foot_ang, -0.2, 0.0)  # from +x end back to -x end
+        pts.append((foot_pos[0] + bdx, foot_pos[1] + bdz, jnp.full(2, 0.045)))
+
+        shoulders, elbows = q[jnp.array([9, 11])], q[jnp.array([10, 12])]
+        chain(0.15, [
+            (shoulders, 0.0, -0.3, 0.04),  # elbow
+            (elbows, 0.0, -0.28, 0.035),   # wrist
+        ])
+
+        dx = jnp.concatenate([p[0] for p in pts])
+        dz = jnp.concatenate([p[1] for p in pts])
+        r = jnp.concatenate([p[2] for p in pts])
+        return dx, dz, r
 
     def reset_qpos_qvel(self, rng: jax.Array) -> tuple[jax.Array, jax.Array]:
         r0, r1 = jax.random.split(rng)
         q0, v0 = self._fighter_reset(r0, 0)
         q1, v1 = self._fighter_reset(r1, 1)
-        # If torsos spawned closer than MIN_SEPARATION, respread them around
-        # their (arena-clamped) midpoint; otherwise leave positions untouched.
+
+        dx0, dz0, rad0 = self._fighter_frame(q0)
+        dx1, dz1, rad1 = self._fighter_frame(q1)
+
+        # Lift each fighter so no limb starts below the floor.
+        for i, (q, dz, rad) in enumerate(((q0, dz0, rad0), (q1, dz1, rad1))):
+            min_dz = jnp.min(dz - rad)  # lowest point relative to root
+            z_abs = self.base_z + q[1]
+            z_abs = jnp.maximum(z_abs, self.SPAWN_GAP - min_dz)
+            q = q.at[1].set(z_abs - self.base_z)
+            if i == 0:
+                q0 = q
+            else:
+                q1 = q
+
+        # Separate fighters so their horizontal reach intervals are disjoint:
+        # no fighter-fighter interpenetration at spawn, by construction.
+        ext0 = jnp.max(jnp.abs(dx0) + rad0)
+        ext1 = jnp.max(jnp.abs(dx1) + rad1)
+        min_sep = ext0 + ext1 + self.SPAWN_GAP
         x0 = self.init_x[0] + q0[0]
         x1 = self.init_x[1] + q1[0]
         d = x1 - x0
         s = jnp.where(d >= 0, 1.0, -1.0)
-        too_close = jnp.abs(d) < self.MIN_SEPARATION
-        c = jnp.clip(0.5 * (x0 + x1), -2.2, 2.2)
-        half = 0.5 * self.MIN_SEPARATION
+        too_close = jnp.abs(d) < min_sep
+        half = 0.5 * min_sep
+        c = jnp.clip(0.5 * (x0 + x1), -(2.4 - half), 2.4 - half)
         new_x0 = jnp.where(too_close, c - s * half, x0)
         new_x1 = jnp.where(too_close, c + s * half, x1)
         q0 = q0.at[0].set(new_x0 - self.init_x[0])
