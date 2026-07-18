@@ -108,8 +108,14 @@ def build_xml() -> str:
     <geom friction="1.0 0.1 0.1" density="1000"/>
     <motor ctrlrange="-1 1" ctrllimited="true"/>
   </default>
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.9 0.93 0.98" rgb2="0.6 0.7 0.85" width="256" height="256"/>
+    <texture name="floor_tex" type="2d" builtin="checker" rgb1="0.75 0.75 0.78" rgb2="0.62 0.62 0.66" width="256" height="256"/>
+    <material name="floor_mat" texture="floor_tex" texrepeat="12 4" reflectance="0.1"/>
+  </asset>
   <worldbody>
-    <geom name="floor" type="plane" size="10 3 0.1" contype="4" conaffinity="3" rgba="0.85 0.85 0.85 1"/>
+    <light directional="true" pos="0 -2 4" dir="0 0.3 -1" diffuse="0.9 0.9 0.9" specular="0.2 0.2 0.2"/>
+    <geom name="floor" type="plane" size="10 3 0.1" contype="4" conaffinity="3" material="floor_mat"/>
     {_fighter("f0", INIT_X[0], 1, 6, "0.85 0.25 0.2 1")}
     {_fighter("f1", INIT_X[1], 2, 5, "0.2 0.4 0.85 1")}
   </worldbody>
