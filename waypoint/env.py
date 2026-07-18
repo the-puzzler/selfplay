@@ -53,6 +53,7 @@ REACH = 0.6
 # vertical ends the episode (a fail, reward 0). Kills tumbling gaits as a
 # strategy without any reward shaping — it's a rule, not a bonus.
 TIP_LIMIT = 1.3  # rad (~75 degrees)
+TIP_GRACE = 15  # ticks before the tip rule arms (spawn wobble amnesty)
 # PARTIAL observation: terrain visible only within ~2 units of the body.
 # Waypoints can be 9 units out — the terrain between must be discovered by
 # traveling and REMEMBERED (the recurrent policy's job). The waypoint
@@ -142,12 +143,17 @@ class WaypointEnv:
             vel = jnp.zeros((N_PTS, 2))
             wp_dx = 5.0
         else:
-            # Upright-ish spawn: random limbs, near-vertical torso, low height.
+            # Supportive spawn: torso upright, ARMS fully random, LEGS in a
+            # downward cone (feet under the body) so balance is catchable.
             tang = jax.random.uniform(ka, minval=-0.25, maxval=0.25)
-            jang = jax.random.uniform(kj, (N_JOINTS,), minval=-jnp.pi, maxval=jnp.pi)
-            z = jax.random.uniform(kp, minval=0.5, maxval=1.3)
+            kj1, kj2 = jax.random.split(kj)
+            arms = jax.random.uniform(kj1, (4,), minval=-jnp.pi, maxval=jnp.pi)
+            legs = jax.random.uniform(kj2, (4,), minval=-0.5, maxval=0.5)
+            legs = legs.at[jnp.array([0, 2])].add(jnp.pi)  # hips point down
+            jang = jnp.concatenate([arms, legs])
+            z = jax.random.uniform(kp, minval=0.85, maxval=1.15)
             pts = self._pose_pts(jnp.array([0.0, z]), tang, jang)
-            scale = jax.random.uniform(kc)
+            scale = 0.5 * jax.random.uniform(kc)
             vel = scale * (1.0 * jax.random.normal(kc, (2,))[None] +
                            0.7 * jax.random.normal(kv, (N_PTS, 2)))
             kw1, kw2 = jax.random.split(kw)
@@ -239,7 +245,7 @@ class WaypointEnv:
         reached = jnp.linalg.norm(pts[2] - s.wp) < REACH
         torso = pts[1] - pts[2]  # pelvis -> neck
         tipped = jnp.abs(jnp.arctan2(torso[0], torso[1])) > TIP_LIMIT
-        tipped = tipped & ~reached
+        tipped = tipped & ~reached & (t > TIP_GRACE)
         timeout = t >= EPISODE_LEN
         done = reached | timeout | tipped
         reward = reached.astype(jnp.float32)
