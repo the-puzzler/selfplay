@@ -1,0 +1,23 @@
+{
+  "game": "othello",
+  "num_envs": 4096,
+  "rollout_len": 32,
+  "num_minibatches": 8,
+  "update_epochs": 3,
+  "lr": 0.0003,
+  "gamma": 0.997,
+  "gae_lambda": 0.95,
+  "clip_eps": 0.2,
+  "vf_coef": 0.5,
+  "ent_coef": 0.01,
+  "max_grad_norm": 0.5,
+  "width": 128,
+  "depth": 6,
+  "arch": "aznet",
+  "reset_pool": 8192,
+  "reset_max_depth": 50,
+  "opp_pool_frac": 0.5,
+  "pool_size": 12,
+  "pool_every": 100,
+  "seed": 0
+}

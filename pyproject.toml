@@ -1,0 +1,24 @@
+[project]
+name = "selfplay-zero-search"
+version = "1.0.0"
+description = "Search-free self-play PPO beats Gumbel AlphaZero baselines (same exact network) on Othello, Hex and Go 9x9"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "flax>=0.10",
+    "jax>=0.4.35",
+    "numpy>=2.0",
+    "optax>=0.2",
+    "pgx>=2.6",
+    # only needed to load the published haiku baselines (pgx4/az_baseline.py
+    # shims the removed jax.core aliases it references under jax>=0.11)
+    "dm-haiku>=0.0.16",
+]
+
+[project.optional-dependencies]
+cuda = [
+    "jax[cuda12]>=0.4.35",
+    # cudnn 9.24 fails with CUDNN_STATUS_SUBLIBRARY_LOADING_FAILED on Blackwell
+    # GPUs with jaxlib 0.11; 9.8 works.
+    "nvidia-cudnn-cu12==9.8.0.87",
+]
