@@ -1,4 +1,4 @@
-# Delete the search, keep the network
+# Search-free self-play PPO vs. Gumbel AlphaZero
 
 **Pure self-play PPO — no MCTS, no teacher, no reward shaping — beats Gumbel AlphaZero's
 published baseline networks at Othello, Hex 11×11 and Go 9×9, using the exact same
@@ -71,11 +71,10 @@ uv run python -m pgx4.play --game othello \
     --human-seat 0        # you move first; --human-seat 1 to move second
 ```
 
-ASCII board in the terminal (plus a `board.svg` refreshed every move for a prettier
-view); enter moves like `d3`, or `pass`/`swap`. Same flags work with `--game hex` and
-`--game go_9x9` and their checkpoints; `--selfplay` watches the model play itself.
-Fair warning: the models play their single greedy move with no search — beatable by
-strong humans, but they know what they're doing.
+ASCII board in the terminal (plus a `board.svg` refreshed every move); enter moves
+like `d3`, or `pass`/`swap`. Same flags work with `--game hex` and `--game go_9x9`
+and their checkpoints; `--selfplay` watches the model play itself. The models play
+a single greedy policy move with no search.
 
 ## Reproduce
 
