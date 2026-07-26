@@ -49,7 +49,10 @@ their Go 9×9       200 iters × 1,024 envs × 256 steps = 52.4M frames × 33¹ 
 ```
 ¹ 32 MCTS simulations + 1 played move per frame; in AlphaZero the search simulator is the
 real environment. All of their figures are from §5 of the Pgx paper. We beat their Go net
-using **0.61×** its environment interactions.
+using **0.61×** its environment interactions. The iteration counts are verified against the
+released checkpoints themselves: their BatchNorm EMA update counters read exactly 6,400
+(= 100 iters × 64 gradient steps) for othello_v0/hex_v0 and 12,800 (= 200 × 64) for
+go_9x9_v0 (`pgx4/audit.py`).
 
 ## Honest caveats
 

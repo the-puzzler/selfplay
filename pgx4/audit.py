@@ -65,3 +65,13 @@ for game, (model_id, ckpt, plies) in GAMES.items():
         s = np.mean(scores); se = np.sqrt(np.mean(np.array(ses)**2)/len(seeds))
         print(f"  {name}: {s:.4f} +/- {se:.4f} (clustered SE, {ns} games)", flush=True)
 print("AUDIT DONE", flush=True)
+
+# Forensic check: do the released checkpoints match the paper's stated training
+# lengths? haiku BatchNorm EMA counters increment once per gradient step; their
+# setup runs 262,144 frames/iter / 4,096 minibatch = 64 steps per iteration.
+import pickle
+for mid, iters in [("othello_v0", 100), ("hex_v0", 100), ("go_9x9_v0", 200)]:
+    d = pickle.load(open(f"baselines/{mid}.ckpt", "rb"))
+    counters = {int(np.asarray(v["counter"])) for v in d["state"].values() if "counter" in v}
+    assert counters == {iters * 64}, (mid, counters)
+    print(f"{mid}: BN EMA counter {counters} == {iters} iters x 64 steps  OK")
