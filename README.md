@@ -58,6 +58,11 @@ using **0.61×** its environment interactions.
   has external calibration (beat Pachi 62–38, playing with 800-simulation search).
 - Their published Elo evaluations use 32-simulation search at play time; our head-to-heads
   are raw policy vs raw policy on both sides (symmetric, but a different regime).
+- The published baselines are the paper's 100-iteration (Othello/Hex) and 200-iteration
+  (Go) checkpoints; the authors trained to 400 iterations, so stronger unreleased
+  checkpoints of the same nets exist. We compare against what was published.
+- One training run per game (seed 0). The evaluation seeds vary and the result
+  replicates across three games, but training-run variance is not characterized.
 - All claims here are **comparative — about the training objective** — not claims of
   absolute playing strength.
 
