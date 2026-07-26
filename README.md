@@ -18,6 +18,8 @@ Gumbel AlphaZero (32 MCTS simulations per move).
 ² The iter-3000 checkpoint, whose total environment interactions (393M) are *below* the
 baseline's own training cost (865M, search included).
 
+![Score vs total environment steps](results/score_vs_env_steps.svg)
+
 ## The controlled experiment
 
 Everything is held fixed except the training objective:
@@ -58,6 +60,22 @@ using **0.61×** its environment interactions.
   are raw policy vs raw policy on both sides (symmetric, but a different regime).
 - All claims here are **comparative — about the training objective** — not claims of
   absolute playing strength.
+
+## Play against the models
+
+```bash
+uv sync   # CPU is fine for play
+uv run python -m pgx4.play --game othello \
+    --ckpt results/checkpoints/oth-aznet-s0-final.msgpack \
+    --config results/checkpoints/oth-aznet-s0-config.json \
+    --human-seat 0        # you move first; --human-seat 1 to move second
+```
+
+ASCII board in the terminal (plus a `board.svg` refreshed every move for a prettier
+view); enter moves like `d3`, or `pass`/`swap`. Same flags work with `--game hex` and
+`--game go_9x9` and their checkpoints; `--selfplay` watches the model play itself.
+Fair warning: the models play their single greedy move with no search — beatable by
+strong humans, but they know what they're doing.
 
 ## Reproduce
 
