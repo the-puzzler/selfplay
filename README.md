@@ -104,6 +104,12 @@ uv run python -m pgx4.transplant_check
 `results/frames_vs_score.csv` holds every checkpoint's score by exact frame count
 (frames = iteration × 131,072).
 
+`pgx4/audit.py` re-runs the consistency battery behind these numbers: self-play
+symmetry invariants (each agent vs itself must score exactly 0.500 — catches any
+seat/reward bias in the evaluator), baseline-vs-random strength checks (~1.0 —
+catches a corrupted baseline load), and a fresh-seed re-verification of all three
+head-to-heads with opening-clustered standard errors. All pass.
+
 ## Files
 
 - `pgx4/train.py` — self-play PPO trainer (diverse resets, opponent pool, negamax GAE;
