@@ -25,7 +25,7 @@ baseline's own training cost (865M, search included).
 Everything is held fixed except the training objective:
 
 - **Network:** an exact Flax port of Pgx's `AZNet v0` (ResNet-v2, 128 channels × 6 blocks,
-  BatchNorm, tanh value head; 1.83M parameters). The port is verified **bit-exact**:
+  BatchNorm, tanh value head; 1,793,995 trainable parameters — identical count on both sides, since the value/critic head is part of the architecture). The port is verified **bit-exact**:
   loading their released weights reproduces their outputs with max |diff| = 0.0 and 100%
   greedy-move agreement (`pgx4/transplant_check.py`).
 - **Their objective:** Gumbel AlphaZero — MCTS in the training loop generating
