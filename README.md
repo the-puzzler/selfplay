@@ -20,6 +20,11 @@ baseline's own training cost (865M, search included).
 
 ![Score vs total environment steps](results/score_vs_env_steps.svg)
 
+[`results/othello_vs_baseline_9games.mp4`](results/othello_vs_baseline_9games.mp4) shows nine
+consecutive evaluation games against `othello_v0` playing out simultaneously (fixed seeds, not
+cherry-picked): 7 wins, 2 losses. Green frame = our net won, red = the baseline won; the disc
+icon marks which color our net played.
+
 ## The controlled experiment
 
 Everything is held fixed except the training objective:
